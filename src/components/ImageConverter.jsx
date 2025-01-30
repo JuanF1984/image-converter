@@ -31,7 +31,11 @@ export const ImageConverter = () => {
         await Promise.all(promises);
 
         if (images.length > 1) {
-            // Si hay varias imágenes, descargar ZIP
+            // Si hay varias imágenes, descargar 
+            const zip = new JSZip();
+            images.forEach((file) => {
+                zip.file(file.name, file);
+            });
             zip.generateAsync({ type: "blob" }).then((content) => {
                 saveAs(content, "imagenes_procesadas.zip");
                 setSuccessMessage("¡Proceso completado con éxito!");
@@ -39,17 +43,37 @@ export const ImageConverter = () => {
                 setLoading(false);
             });
         } else {
-            // Si es una sola imagen, descargarla directamente
-            zip
-                .generateAsync({ type: "blob" })
-                .then((content) => content.arrayBuffer())
-                .then((buffer) => {
-                    const blob = new Blob([buffer]);
-                    saveAs(blob, images[0].name.replace(/\.\w+$/, convertToWebP ? ".webp" : ""));
-                    setSuccessMessage("¡Proceso completado con éxito!");
-                    setImages([]); // Limpiar la lista de imágenes
-                    setLoading(false);
-                });
+            // Para una sola imagen, procesarla y descargarla
+            const file = images[0];
+            const format = convertToWebP ? "image/webp" : file.type;
+
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+
+            img.onload = () => {
+                const newWidth = width || img.width;
+                const newHeight = height || img.height;
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+                canvas.toBlob(
+                    (blob) => {
+                        const fileName = file.name.replace(/\.\w+$/, convertToWebP ? ".webp" : `.${file.name.split('.').pop()}`);
+                        const contentType = convertToWebP ? "image/webp" : file.type;
+                        const newBlob = new Blob([blob], { type: contentType });
+                        saveAs(newBlob, fileName);
+                        setSuccessMessage("¡Proceso completado con éxito!");
+                        setImages([]);
+                        setLoading(false);
+                    },
+                    format,
+                    quality
+                );
+            };
         }
     };
 
@@ -76,13 +100,13 @@ export const ImageConverter = () => {
                     canvas.toBlob(
                         (blob) => {
                             zip.file(
-                                file.name.replace(/\.\w+$/, convertToWebP ? ".webp" : ""),
+                                file.name.replace(/\.\w+$/, convertToWebP ? ".webp" : `.${file.type.split('/')[1]}`),
                                 blob
                             );
                             resolve();
                         },
                         format,
-                        quality
+                        convertToWebP ? quality : 1
                     );
                 };
             };
