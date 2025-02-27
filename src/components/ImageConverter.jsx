@@ -28,52 +28,54 @@ export const ImageConverter = () => {
         const zip = new JSZip();
         const promises = images.map((file) => processImage(file, zip));
 
-        await Promise.all(promises);
+        try {
+            await Promise.all(promises);
+            
+            if (images.length > 1) {
+                // Si hay varias imágenes, descargar como ZIP
+                zip.generateAsync({ type: "blob" }).then((content) => {
+                    saveAs(content, "sur-digital-imagenes_procesadas.zip");
+                    setSuccessMessage("¡Proceso completado con éxito!");
+                    setImages([]); // Limpiar la lista de imágenes
+                    setLoading(false);
+                });
+            } else {
+                // Para una sola imagen, procesarla y descargarla directamente
+                const file = images[0];
+                const format = convertToWebP ? "image/webp" : file.type;
+                
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                
+                img.onload = () => {
+                    const newWidth = width || img.width;
+                    const newHeight = height || img.height;
+                    
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    
+                    canvas.toBlob(
+                        (blob) => {
+                            // Añadir "sur-digital" al nombre del archivo individual
+                            const baseName = file.name.replace(/\.\w+$/, "");
+                            const fileName = `sur-digital-${baseName}${convertToWebP ? ".webp" : `.${file.name.split('.').pop()}`}`;
 
-        if (images.length > 1) {
-            // Si hay varias imágenes, descargar 
-            const zip = new JSZip();
-            images.forEach((file) => {
-                zip.file(file.name, file);
-            });
-            zip.generateAsync({ type: "blob" }).then((content) => {
-                saveAs(content, "imagenes_procesadas.zip");
-                setSuccessMessage("¡Proceso completado con éxito!");
-                setImages([]); // Limpiar la lista de imágenes
-                setLoading(false);
-            });
-        } else {
-            // Para una sola imagen, procesarla y descargarla
-            const file = images[0];
-            const format = convertToWebP ? "image/webp" : file.type;
-
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-
-            img.onload = () => {
-                const newWidth = width || img.width;
-                const newHeight = height || img.height;
-
-                canvas.width = newWidth;
-                canvas.height = newHeight;
-                ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-                canvas.toBlob(
-                    (blob) => {
-                        const fileName = file.name.replace(/\.\w+$/, convertToWebP ? ".webp" : `.${file.name.split('.').pop()}`);
-                        const contentType = convertToWebP ? "image/webp" : file.type;
-                        const newBlob = new Blob([blob], { type: contentType });
-                        saveAs(newBlob, fileName);
-                        setSuccessMessage("¡Proceso completado con éxito!");
-                        setImages([]);
-                        setLoading(false);
-                    },
-                    format,
-                    quality
-                );
-            };
+                            saveAs(blob, fileName);
+                            setSuccessMessage("¡Proceso completado con éxito!");
+                            setImages([]);
+                            setLoading(false);
+                        },
+                        format,
+                        quality
+                    );
+                };
+            }
+        } catch (error) {
+            console.error("Error al procesar imágenes:", error);
+            setLoading(false);
         }
     };
 
@@ -99,14 +101,15 @@ export const ImageConverter = () => {
                     const format = convertToWebP ? "image/webp" : file.type;
                     canvas.toBlob(
                         (blob) => {
-                            zip.file(
-                                file.name.replace(/\.\w+$/, convertToWebP ? ".webp" : `.${file.type.split('/')[1]}`),
-                                blob
-                            );
+                            // Añadir "sur-digital" al nombre del archivo
+                            const baseName = file.name.replace(/\.\w+$/, "");
+                            const newFilename = `sur-digital-${baseName}${convertToWebP ? ".webp" : `.${file.type.split('/')[1]}`}`;
+
+                            zip.file(newFilename, blob);
                             resolve();
                         },
                         format,
-                        convertToWebP ? quality : 1
+                        quality // Usar la calidad seleccionada para todos los formatos
                     );
                 };
             };
